@@ -1,0 +1,12 @@
+.env
+credentials.md
+*.log
+*.tmp
+.DS_Store
+node_modules/
+dist/
+build/
+coverage/
+.idea/ 
+.vscode/
+*.sublime-project
