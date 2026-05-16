@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from .models import LearningPath, Module, Lesson, Question
 from .serializers import (
     LearningPathListSerializer,
@@ -18,7 +18,7 @@ from rest_framework.exceptions import PermissionDenied
 
 
 class LearningPathViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = LearningPath.objects.filter(status=LearningPath.Status.PUBLISHED)
+    ordering = ["-created_at"]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -27,6 +27,42 @@ class LearningPathViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         return {"request": self.request}
+
+    def get_queryset(self):
+        qs = LearningPath.objects.filter(status=LearningPath.Status.PUBLISHED)
+        if self.action == "list":
+            from enrollment.models import Enrollment
+            qs = qs.order_by('-created_at').select_related('instructor').annotate(
+                _module_count=Count('modules', distinct=True),
+                _lesson_count=Count('modules__lessons', distinct=True),
+                _enrolled_count=Count('enrollments', distinct=True),
+            ).prefetch_related(
+                Prefetch('enrollments',
+                    queryset=Enrollment.objects.filter(user=self.request.user).prefetch_related('completions'),
+                    to_attr='_user_enrollments',
+                ),
+            )
+        elif self.action == "retrieve":
+            from enrollment.models import Enrollment, LessonCompletion
+            qs = qs.select_related('instructor').prefetch_related(
+                Prefetch('enrollments',
+                    queryset=Enrollment.objects.filter(user=self.request.user).prefetch_related('completions'),
+                    to_attr='_user_enrollments',
+                ),
+                Prefetch('modules',
+                    queryset=Module.objects.order_by('sort_order').prefetch_related(
+                        Prefetch('lessons',
+                            queryset=Lesson.objects.filter(status=Lesson.Status.PUBLISHED).order_by('sort_order').prefetch_related(
+                                Prefetch('lesson_completions',
+                                    queryset=LessonCompletion.objects.filter(user=self.request.user),
+                                    to_attr='_user_completions',
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        return qs
 
     @action(detail=True, methods=["post"])
     def enroll(self, request, pk=None):

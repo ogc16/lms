@@ -1,8 +1,70 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Menu, X, CheckCircle, Circle, Lock, FileText, Video, HelpCircle } from 'lucide-react'
+import { ChevronLeft, Menu, X, CheckCircle, Circle, Lock, FileText, Video, HelpCircle } from 'lucide-react'
 import { usePathStore } from '../stores/pathStore'
 import { usePlayerStore } from '../stores/playerStore'
+
+function embedUrl(url: string): string {
+  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+    if (m) return `https://www.youtube.com/embed/${m[1]}`
+  }
+  if (url.includes('youtube.com/embed')) return url
+  return url
+}
+
+function renderMarkdown(text: string) {
+  const inline = (s: string) =>
+    s
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded-lg my-3" loading="lazy" />')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-600 underline" target="_blank" rel="noopener">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      .replace(/_([^_]+)_/g, '<em>$1</em>')
+
+  const blocks: string[] = []
+  let inUl = false
+  let inOl = false
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed) {
+      if (inUl) { blocks.push('</ul>'); inUl = false }
+      if (inOl) { blocks.push('</ol>'); inOl = false }
+      continue
+    }
+    const h3 = trimmed.match(/^### (.+)/)
+    if (h3) { blocks.push(`<h3 class="text-lg font-semibold mt-4 mb-2">${inline(h3[1])}</h3>`); continue }
+    const h2 = trimmed.match(/^## (.+)/)
+    if (h2) { blocks.push(`<h2 class="text-xl font-semibold mt-5 mb-2">${inline(h2[1])}</h2>`); continue }
+    const h1 = trimmed.match(/^# (.+)/)
+    if (h1) { blocks.push(`<h1 class="text-2xl font-bold mt-5 mb-3">${inline(h1[1])}</h1>`); continue }
+    const ul = trimmed.match(/^- (.+)/)
+    if (ul) {
+      if (inOl) { blocks.push('</ol>'); inOl = false }
+      if (!inUl) { blocks.push('<ul class="space-y-1 my-2 list-disc pl-5">'); inUl = true }
+      blocks.push(`<li>${inline(ul[1])}</li>`)
+      continue
+    }
+    const ol = trimmed.match(/^\d+\. (.+)/)
+    if (ol) {
+      if (inUl) { blocks.push('</ul>'); inUl = false }
+      if (!inOl) { blocks.push('<ol class="space-y-1 my-2 list-decimal pl-5">'); inOl = true }
+      blocks.push(`<li>${inline(ol[1])}</li>`)
+      continue
+    }
+    if (trimmed.startsWith('<img')) {
+      blocks.push(trimmed)
+      continue
+    }
+    if (inUl) { blocks.push('</ul>'); inUl = false }
+    if (inOl) { blocks.push('</ol>'); inOl = false }
+    blocks.push(`<p class="mb-2">${inline(trimmed)}</p>`)
+  }
+  if (inUl) blocks.push('</ul>')
+  if (inOl) blocks.push('</ol>')
+  return <div dangerouslySetInnerHTML={{ __html: blocks.join('\n') }} />
+}
 
 export default function CoursePlayerPage() {
   const { pathId, lessonId } = useParams()
@@ -40,6 +102,7 @@ export default function CoursePlayerPage() {
   const currentIdx = allLessons.findIndex((l) => l.id === Number(lessonId))
   const currentLocked = isLocked(currentIdx)
   const firstAvailable = firstIncompleteIdx >= 0 ? firstIncompleteIdx : 0
+  const nextInOrder = allLessons[currentIdx + 1]
 
   // Redirect if current lesson is locked
   useEffect(() => {
@@ -60,19 +123,12 @@ export default function CoursePlayerPage() {
     return null
   })()
 
-  // find next available (the first one after current that is not locked)
-  const nextLesson = (() => {
-    for (let i = currentIdx + 1; i < allLessons.length; i++) {
-      if (!isLocked(i)) return allLessons[i]
-    }
-    return null
-  })()
-
   const handleComplete = async () => {
     if (!lessonId) return
     await completeLesson(Number(lessonId))
-    if (nextLesson) {
-      navigate(`/paths/${pathId}/lessons/${nextLesson.id}`)
+    const nextInOrder = allLessons[currentIdx + 1]
+    if (nextInOrder) {
+      navigate(`/paths/${pathId}/lessons/${nextInOrder.id}`)
     }
   }
 
@@ -167,17 +223,22 @@ export default function CoursePlayerPage() {
             <div className="flex items-center justify-center h-full text-gray-400">Loading...</div>
           ) : currentLesson ? (
             <div className="max-w-3xl mx-auto px-6 py-8">
-              {/* Content type display */}
-              {currentLesson.content_type === 'VIDEO' && (
-                <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center mb-6">
-                  <Video className="w-16 h-16 text-gray-500" />
+              {/* Video embed from content_url */}
+              {currentLesson.content_url && (
+                <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden mb-6">
+                  <iframe
+                    src={embedUrl(currentLesson.content_url)}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={currentLesson.title}
+                  />
                 </div>
               )}
-              {currentLesson.content_type === 'MARKDOWN' && currentLesson.content_body && (
-                <div className="prose prose-sm max-w-none mb-6 bg-gray-50 rounded-xl p-6 border">
-                  {currentLesson.content_body.split('\n').map((line, i) => (
-                    <p key={i} className="mb-2">{line}</p>
-                  ))}
+              {/* Content body (shown for all non-quiz types) */}
+              {currentLesson.content_type !== 'QUIZ' && currentLesson.content_body && (
+                <div className="mb-6 bg-gray-50 rounded-xl p-6 border">
+                  {renderMarkdown(currentLesson.content_body)}
                 </div>
               )}
               {currentLesson.content_type === 'QUIZ' && (
@@ -271,7 +332,7 @@ export default function CoursePlayerPage() {
                   className="bg-primary-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 flex items-center gap-2"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  {nextLesson ? 'Complete & Continue' : 'Complete'}
+                  {nextInOrder ? 'Complete & Continue' : 'Complete'}
                 </button>
               </div>
             </div>

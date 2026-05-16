@@ -15,6 +15,9 @@ class LessonSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "is_completed", "created_at", "updated_at")
 
     def get_is_completed(self, obj):
+        completions = getattr(obj, '_user_completions', None)
+        if completions is not None:
+            return len(completions) > 0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.lesson_completions.filter(user=request.user).exists()
@@ -34,6 +37,9 @@ class LessonListSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "is_completed", "created_at", "updated_at")
 
     def get_is_completed(self, obj):
+        completions = getattr(obj, '_user_completions', None)
+        if completions is not None:
+            return len(completions) > 0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.lesson_completions.filter(user=request.user).exists()
@@ -101,21 +107,35 @@ class LearningPathListSerializer(serializers.ModelSerializer):
         return obj.instructor.get_full_name() or obj.instructor.email
 
     def get_module_count(self, obj):
-        return obj.modules.count()
+        return getattr(obj, '_module_count', None) or obj.modules.count()
 
     def get_lesson_count(self, obj):
-        return Lesson.objects.filter(module__learning_path=obj).count()
+        return getattr(obj, '_lesson_count', None) or Lesson.objects.filter(module__learning_path=obj).count()
 
     def get_enrolled_count(self, obj):
-        return obj.enrollments.count()
+        return getattr(obj, '_enrolled_count', None) or obj.enrollments.count()
 
     def get_is_enrolled(self, obj):
+        enrollments = getattr(obj, '_user_enrollments', None)
+        if enrollments is not None:
+            return len(enrollments) > 0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.enrollments.filter(user=request.user).exists()
         return False
 
     def get_progress_percent(self, obj):
+        enrollments = getattr(obj, '_user_enrollments', None)
+        if enrollments is not None:
+            if enrollments:
+                total = getattr(obj, '_lesson_count', None)
+                if total is None:
+                    total = Lesson.objects.filter(module__learning_path=obj).count()
+                if total == 0:
+                    return 0.0
+                completed = enrollments[0].completions.count()
+                return round((completed / total) * 100, 1)
+            return 0.0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             enrollment = obj.enrollments.filter(user=request.user).first()
@@ -144,12 +164,28 @@ class LearningPathDetailSerializer(serializers.ModelSerializer):
         return UserSerializer(obj.instructor).data
 
     def get_is_enrolled(self, obj):
+        enrollments = getattr(obj, '_user_enrollments', None)
+        if enrollments is not None:
+            return len(enrollments) > 0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return obj.enrollments.filter(user=request.user).exists()
         return False
 
     def get_progress_percent(self, obj):
+        enrollments = getattr(obj, '_user_enrollments', None)
+        if enrollments is not None:
+            if enrollments:
+                lesson_qs = Lesson.objects.filter(
+                    module__learning_path=obj,
+                    status=Lesson.Status.PUBLISHED,
+                )
+                total = lesson_qs.count()
+                if total == 0:
+                    return 0.0
+                completed = enrollments[0].completions.count()
+                return round((completed / total) * 100, 1)
+            return 0.0
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             enrollment = obj.enrollments.filter(user=request.user).first()

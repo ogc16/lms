@@ -20,17 +20,26 @@ class Enrollment(models.Model):
         db_table = "enrollments"
         unique_together = ("user", "learning_path")
 
+    _total_lessons_cache = None
+    _completed_lessons_cache = None
+
     @property
     def total_lessons(self):
+        if self._total_lessons_cache is not None:
+            return self._total_lessons_cache
         from learning.models import Lesson
-        return Lesson.objects.filter(
+        self._total_lessons_cache = Lesson.objects.filter(
             module__learning_path=self.learning_path,
             status=Lesson.Status.PUBLISHED,
         ).count()
+        return self._total_lessons_cache
 
     @property
     def completed_lessons(self):
-        return self.completions.count()
+        if self._completed_lessons_cache is not None:
+            return self._completed_lessons_cache
+        self._completed_lessons_cache = self.completions.count()
+        return self._completed_lessons_cache
 
     @property
     def progress_percent(self):
