@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Menu, X, CheckCircle, Circle, Lock, FileText, Video, HelpCircle } from 'lucide-react'
+import { ChevronLeft, Menu, X, CheckCircle, Circle, Lock, FileText, Video, HelpCircle, Award, Star, Send } from 'lucide-react'
 import { usePathStore } from '../stores/pathStore'
 import { usePlayerStore } from '../stores/playerStore'
+import api from '../api/client'
+import type { CompleteLessonResponse, ReviewResponse, CertificateResponse } from '../types'
 
 function embedUrl(url: string): string {
   if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
@@ -75,6 +77,12 @@ export default function CoursePlayerPage() {
   const { completeLesson } = usePlayerStore()
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [submittedQuestions, setSubmittedQuestions] = useState<Record<number, boolean>>({})
+  const [showCompletion, setShowCompletion] = useState(false)
+  const [certificateId, setCertificateId] = useState<string | null>(null)
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewSubmitted, setReviewSubmitted] = useState(false)
+  const [submittingReview, setSubmittingReview] = useState(false)
 
   useEffect(() => {
     if (pathId) fetchPathDetail(Number(pathId))
@@ -125,11 +133,26 @@ export default function CoursePlayerPage() {
 
   const handleComplete = async () => {
     if (!lessonId) return
-    await completeLesson(Number(lessonId))
+    const data = await completeLesson(Number(lessonId))
+    if (data.is_path_completed) {
+      setCertificateId(data.certificate_id)
+      setShowCompletion(true)
+      return
+    }
     const nextInOrder = allLessons[currentIdx + 1]
     if (nextInOrder) {
       navigate(`/paths/${pathId}/lessons/${nextInOrder.id}`)
     }
+  }
+
+  const handleSubmitReview = async () => {
+    if (reviewRating === 0) return
+    setSubmittingReview(true)
+    try {
+      await api.post(`/enrollments/paths/${pathId}/review/`, { rating: reviewRating, comment: reviewComment })
+      setReviewSubmitted(true)
+    } catch { /* ignore */ }
+    setSubmittingReview(false)
   }
 
   const iconMap: Record<string, React.ReactNode> = {
@@ -346,6 +369,102 @@ export default function CoursePlayerPage() {
           <div className="h-1 bg-primary-600 transition-all" style={{ width: `${activePath?.progress_percent ?? 0}%` }} />
         </div>
       </div>
+
+      {/* Completion Modal */}
+      {showCompletion && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Award className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Congratulations!</h2>
+            <p className="text-gray-500 mb-6">You completed the course successfully!</p>
+
+            {certificateId && (
+              <a
+                href={`/api/enrollments/paths/${pathId}/certificate/`}
+                target="_blank"
+                className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-primary-700 mb-6"
+                onClick={(e) => {
+                  e.preventDefault()
+                  api.get<CertificateResponse>(`/enrollments/paths/${pathId}/certificate/`).then(({ data }) => {
+                    if (!data) return
+                    const win = window.open('', '_blank')
+                    if (!win) return
+                    win.document.write(`
+                      <!DOCTYPE html><html><head><title>Certificate</title>
+                      <style>
+                        body { font-family: Georgia, serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f3f4f6; }
+                        .cert { width: 700px; padding: 50px; background: white; border: 8px double #1e40af; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
+                        h1 { font-size: 32px; color: #1e40af; margin-bottom: 5px; }
+                        .subtitle { font-size: 14px; color: #6b7280; letter-spacing: 3px; text-transform: uppercase; }
+                        .name { font-size: 28px; font-weight: bold; margin: 20px 0; }
+                        .course { font-size: 20px; color: #374151; margin: 10px 0; }
+                        .details { font-size: 14px; color: #6b7280; margin: 20px 0; }
+                        .id { font-size: 12px; color: #9ca3af; margin-top: 30px; }
+                        hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+                      </style></head><body>
+                      <div class="cert">
+                        <h1>Certificate of Completion</h1>
+                        <p class="subtitle">This certifies that</p>
+                        <p class="name">${document.title.split(' ')[0] || 'Student'}</p>
+                        <p class="subtitle">has successfully completed the course</p>
+                        <p class="course">${data.path_title}</p>
+                        <hr>
+                        <p class="details">Certificate ID: ${data.certificate_id}</p>
+                        <p class="details">Issued: ${new Date(data.issued_at).toLocaleDateString()}</p>
+                      </div></body></html>
+                    `)
+                    win.document.close()
+                  })
+                }}
+              >
+                <Award className="w-5 h-5" /> Download Certificate
+              </a>
+            )}
+
+            <div className="border-t pt-6">
+              <h3 className="font-semibold mb-3">Rate this course</h3>
+              {reviewSubmitted ? (
+                <p className="text-green-600 text-sm flex items-center justify-center gap-1">
+                  <CheckCircle className="w-4 h-4" /> Thank you for your feedback!
+                </p>
+              ) : (
+                <>
+                  <div className="flex justify-center gap-1 mb-4">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button key={star} onClick={() => setReviewRating(star)}>
+                        <Star className={`w-8 h-8 ${star <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    placeholder="Share your thoughts about this course..."
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    className="w-full border rounded-lg p-3 text-sm mb-3 resize-none"
+                    rows={3}
+                  />
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={reviewRating === 0 || submittingReview}
+                    className="bg-primary-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                  >
+                    <Send className="w-4 h-4" /> {submittingReview ? 'Submitting...' : 'Submit Review'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => navigate(`/paths/${pathId}`)}
+              className="mt-6 text-sm text-gray-500 hover:text-primary-600"
+            >
+              Back to Course Overview
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

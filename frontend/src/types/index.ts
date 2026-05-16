@@ -26,6 +26,25 @@ export interface PathListResponse {
   enrolled_count: number
   is_enrolled: boolean
   progress_percent: number
+  semester_id: number | null
+  semester_name: string | null
+}
+
+export interface ProgramResponse {
+  id: number
+  title: string
+  description: string
+  created_at: string
+}
+
+export interface SemesterResponse {
+  id: number
+  program: number
+  program_title: string
+  year_number: number
+  semester_number: number
+  name: string
+  created_at: string
 }
 
 export interface LessonResponse {
@@ -91,6 +110,25 @@ export interface CompleteLessonResponse {
   path_id: number
   progress_percent: number
   is_path_completed: boolean
+  certificate_id: string | null
+}
+
+export interface ReviewResponse {
+  id: number
+  user: number
+  learning_path: number
+  rating: number
+  comment: string
+  created_at: string
+}
+
+export interface CertificateResponse {
+  id: number
+  user: number
+  learning_path: number
+  path_title: string
+  certificate_id: string
+  issued_at: string
 }
 
 export interface EnrollmentResponse {

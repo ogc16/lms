@@ -2,6 +2,34 @@ from django.db import models
 from django.conf import settings
 
 
+class Program(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "programs"
+
+    def __str__(self):
+        return self.title
+
+
+class Semester(models.Model):
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name="semesters")
+    year_number = models.IntegerField()
+    semester_number = models.IntegerField()
+    name = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "semesters"
+        ordering = ["year_number", "semester_number"]
+        unique_together = ("program", "year_number", "semester_number")
+
+    def __str__(self):
+        return f"{self.program.title} - Year {self.year_number}, Sem {self.semester_number}"
+
+
 class LearningPath(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
@@ -24,6 +52,9 @@ class LearningPath(models.Model):
         on_delete=models.CASCADE,
         related_name="authored_paths",
         limit_choices_to={"role": "INSTRUCTOR"},
+    )
+    semester = models.ForeignKey(
+        Semester, on_delete=models.SET_NULL, null=True, blank=True, related_name="learning_paths"
     )
     prerequisites = models.ManyToManyField(
         "self",

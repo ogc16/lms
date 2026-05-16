@@ -78,3 +78,48 @@ class LessonCompletion(models.Model):
 
     def __str__(self):
         return f"{self.user.email} ✓ {self.lesson.title}"
+
+
+class Review(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    learning_path = models.ForeignKey(
+        "learning.LearningPath",
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    rating = models.IntegerField(choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5")])
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "reviews"
+        unique_together = ("user", "learning_path")
+
+    def __str__(self):
+        return f"{self.user.email} → {self.learning_path.title} ({self.rating}★)"
+
+
+class Certificate(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="certificates",
+    )
+    learning_path = models.ForeignKey(
+        "learning.LearningPath",
+        on_delete=models.CASCADE,
+        related_name="certificates",
+    )
+    certificate_id = models.CharField(max_length=64, unique=True)
+    issued_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "certificates"
+        unique_together = ("user", "learning_path")
+
+    def __str__(self):
+        return f"{self.certificate_id} — {self.user.email} ✓ {self.learning_path.title}"

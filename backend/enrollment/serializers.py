@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Enrollment, LessonCompletion
+from .models import Enrollment, LessonCompletion, Review, Certificate
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -20,3 +20,19 @@ class LessonCompletionSerializer(serializers.ModelSerializer):
         model = LessonCompletion
         fields = ("id", "user", "lesson", "enrollment", "completed_at")
         read_only_fields = ("id", "user", "completed_at")
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ("id", "user", "learning_path", "rating", "comment", "created_at")
+        read_only_fields = ("id", "user", "created_at")
+
+
+class CertificateSerializer(serializers.ModelSerializer):
+    path_title = serializers.CharField(source="learning_path.title", read_only=True)
+
+    class Meta:
+        model = Certificate
+        fields = ("id", "user", "learning_path", "path_title", "certificate_id", "issued_at")
+        read_only_fields = ("id", "user", "certificate_id", "issued_at")

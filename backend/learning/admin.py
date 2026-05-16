@@ -1,5 +1,17 @@
 from django.contrib import admin
-from .models import LearningPath, PathPrerequisite, Module, Lesson, Question
+from .models import Program, Semester, LearningPath, PathPrerequisite, Module, Lesson, Question
+
+
+@admin.register(Program)
+class ProgramAdmin(admin.ModelAdmin):
+    list_display = ("title", "created_at")
+    search_fields = ("title",)
+
+
+@admin.register(Semester)
+class SemesterAdmin(admin.ModelAdmin):
+    list_display = ("program", "year_number", "semester_number", "name")
+    list_filter = ("program", "year_number")
 
 
 class ModuleInline(admin.TabularInline):
@@ -12,10 +24,15 @@ class LessonInline(admin.TabularInline):
     extra = 0
 
 
+class SemesterInline(admin.TabularInline):
+    model = Semester
+    extra = 0
+
+
 @admin.register(LearningPath)
 class LearningPathAdmin(admin.ModelAdmin):
-    list_display = ("title", "instructor", "status", "difficulty", "created_at")
-    list_filter = ("status", "difficulty")
+    list_display = ("title", "instructor", "semester", "status", "difficulty", "created_at")
+    list_filter = ("status", "difficulty", "semester__program")
     search_fields = ("title", "instructor__email")
     inlines = [ModuleInline]
 

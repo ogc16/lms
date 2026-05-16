@@ -1,9 +1,12 @@
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from django.db.models import Count, Q, Prefetch
-from .models import LearningPath, Module, Lesson, Question
+from .models import Program, Semester, LearningPath, Module, Lesson, Question
 from .serializers import (
+    ProgramSerializer,
+    SemesterSerializer,
     LearningPathListSerializer,
     LearningPathDetailSerializer,
     ModuleSerializer,
@@ -14,7 +17,24 @@ from .serializers import (
     QuestionSerializer,
 )
 from accounts.permissions import IsInstructorOrAdmin
-from rest_framework.exceptions import PermissionDenied
+
+
+class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Program.objects.all()
+    serializer_class = ProgramSerializer
+    pagination_class = None
+
+
+class SemesterViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = SemesterSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Semester.objects.all()
+        program_id = self.request.query_params.get("program")
+        if program_id:
+            qs = qs.filter(program_id=program_id)
+        return qs
 
 
 class LearningPathViewSet(viewsets.ReadOnlyModelViewSet):
@@ -160,7 +180,8 @@ class LessonViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
-        from enrollment.models import LessonCompletion, Enrollment
+        from enrollment.models import LessonCompletion, Enrollment, Certificate
+        from django.utils.crypto import get_random_string
         lesson = self.get_object()
         enrollment = Enrollment.objects.filter(
             user=request.user, learning_path=lesson.module.learning_path
@@ -170,11 +191,19 @@ class LessonViewSet(viewsets.ModelViewSet):
         _, created = LessonCompletion.objects.get_or_create(
             user=request.user, lesson=lesson, enrollment=enrollment
         )
+        cert_id = None
+        if enrollment.is_completed:
+            cert, _ = Certificate.objects.get_or_create(
+                user=request.user, learning_path=lesson.module.learning_path,
+                defaults={"certificate_id": get_random_string(16).upper()},
+            )
+            cert_id = cert.certificate_id
         return Response({
             "lesson_id": lesson.id,
             "path_id": lesson.module.learning_path.id,
             "progress_percent": enrollment.progress_percent,
             "is_path_completed": enrollment.is_completed,
+            "certificate_id": cert_id,
         })
 
 

@@ -1,5 +1,19 @@
 from rest_framework import serializers
-from .models import LearningPath, Module, Lesson, Question
+from .models import Program, Semester, LearningPath, Module, Lesson, Question
+
+
+class ProgramSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Program
+        fields = ("id", "title", "description", "created_at")
+
+
+class SemesterSerializer(serializers.ModelSerializer):
+    program_title = serializers.CharField(source="program.title", read_only=True)
+
+    class Meta:
+        model = Semester
+        fields = ("id", "program", "program_title", "year_number", "semester_number", "name", "created_at")
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -94,6 +108,8 @@ class LearningPathListSerializer(serializers.ModelSerializer):
     enrolled_count = serializers.SerializerMethodField()
     is_enrolled = serializers.SerializerMethodField()
     progress_percent = serializers.SerializerMethodField()
+    semester_id = serializers.SerializerMethodField()
+    semester_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LearningPath
@@ -101,7 +117,14 @@ class LearningPathListSerializer(serializers.ModelSerializer):
             "id", "title", "description", "cover_image_url", "difficulty",
             "estimated_hours", "status", "instructor_name", "module_count",
             "lesson_count", "enrolled_count", "is_enrolled", "progress_percent",
+            "semester_id", "semester_name",
         )
+
+    def get_semester_id(self, obj):
+        return obj.semester_id
+
+    def get_semester_name(self, obj):
+        return str(obj.semester) if obj.semester else None
 
     def get_instructor_name(self, obj):
         return obj.instructor.get_full_name() or obj.instructor.email
