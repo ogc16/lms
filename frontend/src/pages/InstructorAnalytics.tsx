@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, BarChart3, Users, TrendingUp } from 'lucide-react'
 import api from '../api/client'
+import Footer from '../components/Footer'
 
 interface PathAnalytics {
   path_id: number
@@ -55,6 +56,7 @@ export default function InstructorAnalytics() {
           ))}
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

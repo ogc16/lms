@@ -13,4 +13,5 @@ router.register(r"lessons", views.LessonViewSet, basename="lesson")
 urlpatterns = [
     path("", include(router.urls)),
     path("lessons/<int:lesson_pk>/questions/", views.QuestionViewSet.as_view({"get": "list"}), name="lesson-questions"),
+    path("lessons/<int:lesson_pk>/ai-instruct/", views.AIInstructView.as_view(), name="lesson-ai-instruct"),
 ]

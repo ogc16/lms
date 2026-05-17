@@ -2,8 +2,15 @@ from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Count, Q, Prefetch
+
 from .models import Program, Semester, LearningPath, Module, Lesson, Question
+
+
+class LargePagePagination(PageNumberPagination):
+    page_size = 200
+    page_size_query_param = 'page_size'
 from .serializers import (
     ProgramSerializer,
     SemesterSerializer,
@@ -24,6 +31,21 @@ class ProgramViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProgramSerializer
     pagination_class = None
 
+    @action(detail=True, methods=["post"])
+    def enroll(self, request, pk=None):
+        prog = self.get_object()
+        from enrollment.models import Enrollment
+        path_ids = list(LearningPath.objects.filter(semester__program=prog).values_list("id", flat=True))
+        existing = set(Enrollment.objects.filter(
+            user=request.user, learning_path_id__in=path_ids
+        ).values_list("learning_path_id", flat=True))
+        created = 0
+        for pid in path_ids:
+            if pid not in existing:
+                Enrollment.objects.create(user=request.user, learning_path_id=pid)
+                created += 1
+        return Response({"enrolled": created, "total": len(path_ids)}, status=status.HTTP_201_CREATED)
+
 
 class SemesterViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SemesterSerializer
@@ -38,6 +60,7 @@ class SemesterViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class LearningPathViewSet(viewsets.ReadOnlyModelViewSet):
+    pagination_class = LargePagePagination
     ordering = ["-created_at"]
 
     def get_serializer_class(self):
@@ -205,6 +228,23 @@ class LessonViewSet(viewsets.ModelViewSet):
             "is_path_completed": enrollment.is_completed,
             "certificate_id": cert_id,
         })
+
+
+class AIInstructView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, lesson_pk):
+        from .models import Lesson
+        from .ai_instructor import generate_response
+        question = request.data.get('question', '').strip()
+        if not question:
+            return Response({"error": "Question is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            lesson = Lesson.objects.select_related('module__learning_path').get(id=lesson_pk)
+        except Lesson.DoesNotExist:
+            return Response({"error": "Lesson not found"}, status=status.HTTP_404_NOT_FOUND)
+        result = generate_response(lesson, question)
+        return Response(result)
 
 
 class QuestionViewSet(viewsets.ReadOnlyModelViewSet):

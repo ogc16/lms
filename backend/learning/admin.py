@@ -24,11 +24,6 @@ class LessonInline(admin.TabularInline):
     extra = 0
 
 
-class SemesterInline(admin.TabularInline):
-    model = Semester
-    extra = 0
-
-
 @admin.register(LearningPath)
 class LearningPathAdmin(admin.ModelAdmin):
     list_display = ("title", "instructor", "semester", "status", "difficulty", "created_at")

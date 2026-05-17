@@ -5,19 +5,13 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "full_name", "role", "is_verified", "avatar_url")
+        fields = ("id", "email", "full_name", "role", "is_verified")
         read_only_fields = ("id", "is_verified")
 
     full_name = serializers.SerializerMethodField()
-    avatar_url = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return obj.get_full_name() or obj.email
-
-    def get_avatar_url(self, obj):
-        if hasattr(obj, 'avatar_url'):
-            return obj.avatar_url
-        return None
 
 
 class RegisterSerializer(serializers.ModelSerializer):

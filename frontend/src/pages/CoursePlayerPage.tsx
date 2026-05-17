@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Menu, X, CheckCircle, Circle, Lock, FileText, Video, HelpCircle, Award, Star, Send } from 'lucide-react'
 import { usePathStore } from '../stores/pathStore'
 import { usePlayerStore } from '../stores/playerStore'
 import api from '../api/client'
-import type { CompleteLessonResponse, ReviewResponse, CertificateResponse } from '../types'
+import type { CertificateResponse } from '../types'
+import AIInstructorPanel from '../components/AIInstructorPanel'
 
 function embedUrl(url: string): string {
   if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
@@ -465,6 +466,9 @@ export default function CoursePlayerPage() {
           </div>
         </div>
       )}
+
+      {/* AI Instructor */}
+      {currentLesson && <AIInstructorPanel lessonId={currentLesson.id} />}
     </div>
   )
 }

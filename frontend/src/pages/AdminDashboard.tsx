@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Users, BookOpen, UserCheck, Shield } from 'lucide-react'
 import api from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import Footer from '../components/Footer'
 
 interface UserData {
   id: number
@@ -88,6 +89,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

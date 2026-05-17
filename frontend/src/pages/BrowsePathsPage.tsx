@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { BookOpen, Clock, Users, CheckCircle, ChevronRight, GraduationCap, Layers, Search } from 'lucide-react'
+import { BookOpen, Clock, Users, CheckCircle, ChevronRight, ChevronDown, GraduationCap, Layers, Search, Rocket } from 'lucide-react'
 import api from '../api/client'
 import { useAuthStore } from '../stores/authStore'
 import type { PathListResponse, ProgramResponse, SemesterResponse } from '../types'
+import Footer from '../components/Footer'
 
 export default function BrowsePathsPage() {
   const { user, logout } = useAuthStore()
@@ -13,9 +14,16 @@ export default function BrowsePathsPage() {
   const [semesters, setSemesters] = useState<SemesterResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [enrolling, setEnrolling] = useState<number | null>(null)
+  const [enrollingProgram, setEnrollingProgram] = useState(false)
   const [view, setView] = useState<'program' | 'all'>('program')
   const [search, setSearch] = useState('')
   const [selectedProgram, setSelectedProgram] = useState<number | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const toggleSem = (id: number) => setCollapsed(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
 
   const filteredPaths = useMemo(() => {
     if (!search.trim()) return paths
@@ -28,21 +36,50 @@ export default function BrowsePathsPage() {
 
   useEffect(() => {
     let cancelled = false
+    api.get<ProgramResponse[]>('/programs/').then(r => {
+      if (cancelled) return
+      setPrograms(r.data)
+      if (r.data.length > 0 && !selectedProgram) setSelectedProgram(r.data[0].id)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedProgram) return
+    let cancelled = false
+    setLoading(true)
     Promise.all([
-      api.get<ProgramResponse[]>('/programs/').then(r => {
-        if (cancelled) return
-        setPrograms(r.data)
-        if (r.data.length > 0) setSelectedProgram(r.data[0].id)
-      }).catch(() => {}),
-      api.get<{ results: PathListResponse[] }>('/paths/').then(r => {
-        if (!cancelled) setPaths(r.data.results ?? [])
+      api.get<PathListResponse[]>('/paths/').then(r => {
+        if (!cancelled) setPaths(Array.isArray(r.data) ? r.data : (r.data as any).results ?? [])
       }).catch(() => {}),
       api.get<SemesterResponse[]>('/semesters/').then(r => {
         if (!cancelled) setSemesters(r.data)
       }).catch(() => {}),
     ]).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedProgram])
+
+  const programPaths = useMemo(() =>
+    paths.filter(p => p.semester_id && semesters.find(s => s.id === p.semester_id)?.program === selectedProgram),
+    [paths, semesters, selectedProgram]
+  )
+  const programEnrolledCount = useMemo(() =>
+    programPaths.filter(p => p.is_enrolled).length,
+    [programPaths]
+  )
+  const isProgramFullyEnrolled = programPaths.length > 0 && programEnrolledCount === programPaths.length
+
+  const handleProgramEnroll = async () => {
+    if (!selectedProgram) return
+    setEnrollingProgram(true)
+    try {
+      const { data } = await api.post(`/programs/${selectedProgram}/enroll/`)
+      // Refresh paths to reflect new enrollments
+      const res = await api.get<{ results: PathListResponse[] }>('/paths/')
+      setPaths(res.data.results ?? [])
+    } catch { /* ignore */ }
+    setEnrollingProgram(false)
+  }
 
   const handleEnroll = async (pathId: number) => {
     setEnrolling(pathId)
@@ -126,7 +163,7 @@ export default function BrowsePathsPage() {
               <span className="text-sm text-gray-500">Switch program:</span>
               <select
                 value={selectedProgram ?? ''}
-                onChange={e => setSelectedProgram(Number(e.target.value))}
+                onChange={e => { setLoading(true); setSelectedProgram(Number(e.target.value)) }}
                 className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {programs.map(p => (
@@ -135,27 +172,56 @@ export default function BrowsePathsPage() {
               </select>
             </div>
           )}
-        </div>
-        {grouped.map(({ sem, courses }) => (
-          <section key={sem.id}>
-            <div className="flex items-center gap-3 mb-6">
-              <Layers className="w-5 h-5 text-primary-500" />
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  Year {sem.year_number}, Semester {sem.semester_number}
-                </h3>
-                {sem.name && <p className="text-sm text-gray-500">{sem.name}</p>}
+          {programPaths.length > 0 && !isProgramFullyEnrolled && (
+            <div className="mt-6 bg-primary-50 border border-primary-200 rounded-xl p-4 flex items-center justify-between">
+              <div className="text-left">
+                <p className="text-sm font-medium text-primary-800">
+                  {programEnrolledCount === 0
+                    ? `You are not enrolled in ${prog.title}`
+                    : `Enrolled in ${programEnrolledCount} of ${programPaths.length} courses`}
+                </p>
+                <p className="text-xs text-primary-600 mt-0.5">
+                  {programEnrolledCount === 0
+                    ? 'Enrol now to start all courses in this program.'
+                    : 'Enrol in the remaining courses to complete your program enrolment.'}
+                </p>
               </div>
+              <button onClick={handleProgramEnroll} disabled={enrollingProgram}
+                className="shrink-0 bg-primary-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1.5">
+                <Rocket className="w-4 h-4" />
+                {enrollingProgram ? 'Enrolling...' : `Enrol in All (${programPaths.length - programEnrolledCount})`}
+              </button>
             </div>
-            {courses.length === 0 ? (
-              <p className="text-gray-400 text-sm ml-8">No courses in this semester yet.</p>
+          )}
+          {isProgramFullyEnrolled && (
+            <div className="mt-6 bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+              <p className="text-sm font-medium text-green-700 flex items-center justify-center gap-1.5">
+                <CheckCircle className="w-4 h-4" /> Enrolled in all {programPaths.length} courses of {prog.title}
+              </p>
+            </div>
+          )}
+        </div>
+        {grouped.map(({ sem, courses }) => {
+          const isOpen = !collapsed.has(sem.id)
+          return (
+          <section key={sem.id}>
+            <button onClick={() => toggleSem(sem.id)} className="w-full flex items-center gap-3 mb-4 text-left">
+              <Layers className="w-5 h-5 text-primary-500 shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-gray-900">{sem.name}</h3>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+            </button>
+            {isOpen && (courses.length === 0 ? (
+              <p className="text-gray-400 text-sm ml-8 pb-4">No courses in this semester yet.</p>
             ) : (
-              <div className="grid md:grid-cols-2 gap-6 ml-8">
+              <div className="grid md:grid-cols-2 gap-6 ml-8 pb-4">
                 {courses.map(pathCard)}
               </div>
-            )}
+            ))}
           </section>
-        ))}
+          )
+        })}
         {grouped.length === 0 && (
           <p className="text-center text-gray-400 py-10">No semesters configured yet.</p>
         )}
@@ -225,6 +291,7 @@ export default function BrowsePathsPage() {
           </>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

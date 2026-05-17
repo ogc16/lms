@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BookOpen, Compass, BarChart3, CheckCircle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { usePathStore } from '../stores/pathStore'
+import Footer from '../components/Footer'
 
 export default function LearnerDashboard() {
   const { user, logout } = useAuthStore()
@@ -91,6 +92,7 @@ export default function LearnerDashboard() {
           </section>
         )}
       </main>
+      <Footer />
     </div>
   )
 }

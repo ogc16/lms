@@ -1,7 +1,5 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from django.db.models import Count
 from django.utils.crypto import get_random_string
 from .models import Enrollment, Review, Certificate
 from .serializers import EnrollmentSerializer, ReviewSerializer, CertificateSerializer

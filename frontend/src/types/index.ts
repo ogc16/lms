@@ -131,16 +131,6 @@ export interface CertificateResponse {
   issued_at: string
 }
 
-export interface EnrollmentResponse {
-  id: number
-  user: number
-  learning_path: number
-  path_title: string
-  enrolled_at: string
-  completed_at: string | null
-  progress_percent: number
-}
-
 export interface QuestionResponse {
   id: number
   lesson: number

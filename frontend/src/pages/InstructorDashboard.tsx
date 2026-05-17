@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, BookOpen, Users, BarChart3, Edit3 } from 'lucide-react'
 import api from '../api/client'
 import { useAuthStore } from '../stores/authStore'
+import Footer from '../components/Footer'
 
 interface PathAnalytics {
   path_id: number
@@ -94,6 +95,7 @@ export default function InstructorDashboard() {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Enrollment, LessonCompletion, Review, Certificate
+from .models import Enrollment, Review, Certificate
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -13,13 +13,6 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             "enrolled_at", "completed_at", "progress_percent",
         )
         read_only_fields = ("id", "user", "enrolled_at", "completed_at", "progress_percent")
-
-
-class LessonCompletionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LessonCompletion
-        fields = ("id", "user", "lesson", "enrollment", "completed_at")
-        read_only_fields = ("id", "user", "completed_at")
 
 
 class ReviewSerializer(serializers.ModelSerializer):

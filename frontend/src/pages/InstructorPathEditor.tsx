@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, GripVertical, Trash2 } from 'lucide-react'
 import api from '../api/client'
-import type { PathDetailResponse, ModuleResponse, LessonResponse } from '../types'
+import type { PathDetailResponse, ModuleResponse } from '../types'
+import Footer from '../components/Footer'
 
 export default function InstructorPathEditor() {
   const { id } = useParams()
@@ -86,6 +87,7 @@ export default function InstructorPathEditor() {
           ))}
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

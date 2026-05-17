@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Clock, BookOpen, ChevronLeft, CheckCircle, Circle } from 'lucide-react'
 import { usePathStore } from '../stores/pathStore'
+import Footer from '../components/Footer'
 
 export default function PathDetailPage() {
   const { id } = useParams()
@@ -91,6 +92,7 @@ export default function PathDetailPage() {
           ))}
         </div>
       </main>
+      <Footer />
     </div>
   )
 }

@@ -4,7 +4,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import django
 django.setup()
 from django.test import Client
-from accounts.models import User
 
 c = Client(HTTP_HOST='localhost')
 
