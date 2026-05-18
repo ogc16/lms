@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,8 +11,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me-in-production")
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-if os.getenv("RAILWAY_PUBLIC_DOMAIN"):
-    ALLOWED_HOSTS.append(os.getenv("RAILWAY_PUBLIC_DOMAIN"))
+for host_var in ("RAILWAY_PUBLIC_DOMAIN", "RENDER_EXTERNAL_URL"):
+    host = os.getenv(host_var)
+    if host:
+        ALLOWED_HOSTS.append(host)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -62,7 +65,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "lms_project.wsgi.application"
 
-if os.getenv("PGHOST"):
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    parsed = urlparse(database_url)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": parsed.path[1:],
+            "USER": parsed.username,
+            "PASSWORD": parsed.password,
+            "HOST": parsed.hostname,
+            "PORT": parsed.port or "5432",
+        }
+    }
+elif os.getenv("PGHOST"):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",

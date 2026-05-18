@@ -12,4 +12,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD gunicorn lms_project.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3
+CMD python manage.py collectstatic --noinput && gunicorn lms_project.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3
